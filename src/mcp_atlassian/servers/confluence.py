@@ -785,14 +785,36 @@ async def upload_attachment(
         str, Field(description="The ID of the page to attach the file to")
     ],
     file_path: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "The absolute or relative path to the file to upload. "
-                "Relative paths will be resolved relative to the current working directory."
-            )
+                "Use this when the file is accessible on the server filesystem. "
+                "Cannot be used together with 'content' parameter."
+            ),
+            default=None,
         ),
-    ],
+    ] = None,
+    filename: Annotated[
+        str | None,
+        Field(
+            description=(
+                "The name for the attachment file. Required when using 'content' parameter."
+            ),
+            default=None,
+        ),
+    ] = None,
+    content: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Base64-encoded file content. Use this when running in Docker or when "
+                "the file is not accessible on the server filesystem. "
+                "Requires 'filename' parameter. Cannot be used with 'file_path'."
+            ),
+            default=None,
+        ),
+    ] = None,
     comment: Annotated[
         str | None,
         Field(
@@ -806,7 +828,9 @@ async def upload_attachment(
     Args:
         ctx: The FastMCP context.
         page_id: The ID of the page to attach the file to.
-        file_path: The path to the file to upload.
+        file_path: The path to the file to upload (optional).
+        filename: The name for the attachment (required with content).
+        content: Base64-encoded file content (optional).
         comment: Optional comment for the attachment.
 
     Returns:
@@ -814,10 +838,17 @@ async def upload_attachment(
 
     Raises:
         ValueError: If in read-only mode or Confluence client is unavailable.
+
+    Note:
+        Either file_path OR (filename + content) must be provided.
     """
     confluence_fetcher = await get_confluence_fetcher(ctx)
     result = confluence_fetcher.upload_attachment(
-        page_id=page_id, file_path=file_path, comment=comment
+        page_id=page_id,
+        file_path=file_path,
+        filename=filename,
+        content=content,
+        comment=comment,
     )
     return json.dumps(result, indent=2, ensure_ascii=False)
 
@@ -830,14 +861,28 @@ async def upload_attachments(
         str, Field(description="The ID of the page to attach the files to")
     ],
     file_paths: Annotated[
-        list[str],
+        list[str] | None,
         Field(
             description=(
                 "List of absolute or relative paths to files to upload. "
-                "Relative paths will be resolved relative to the current working directory."
-            )
+                "Use this when files are accessible on the server filesystem. "
+                "Cannot be used together with 'attachments' parameter."
+            ),
+            default=None,
         ),
-    ],
+    ] = None,
+    attachments: Annotated[
+        list[dict[str, str]] | None,
+        Field(
+            description=(
+                "List of attachments with 'filename' and 'content' (base64-encoded) keys. "
+                "Use this when running in Docker or when files are not accessible on the server. "
+                "Example: [{'filename': 'doc.pdf', 'content': 'base64string...'}]. "
+                "Cannot be used with 'file_paths'."
+            ),
+            default=None,
+        ),
+    ] = None,
     comment: Annotated[
         str | None,
         Field(
@@ -851,7 +896,8 @@ async def upload_attachments(
     Args:
         ctx: The FastMCP context.
         page_id: The ID of the page to attach the files to.
-        file_paths: List of paths to files to upload.
+        file_paths: List of paths to files to upload (optional).
+        attachments: List of dicts with filename and base64 content (optional).
         comment: Optional comment for the attachments.
 
     Returns:
@@ -859,10 +905,16 @@ async def upload_attachments(
 
     Raises:
         ValueError: If in read-only mode or Confluence client is unavailable.
+
+    Note:
+        Either file_paths OR attachments must be provided.
     """
     confluence_fetcher = await get_confluence_fetcher(ctx)
     result = confluence_fetcher.upload_attachments(
-        page_id=page_id, file_paths=file_paths, comment=comment
+        page_id=page_id,
+        file_paths=file_paths,
+        attachments=attachments,
+        comment=comment,
     )
     return json.dumps(result, indent=2, ensure_ascii=False)
 

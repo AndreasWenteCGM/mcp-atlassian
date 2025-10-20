@@ -188,11 +188,14 @@ class TestAttachmentsMixin:
         assert "No page ID provided" in result["error"]
 
     def test_upload_attachment_no_file_path(self, attachments_mixin: AttachmentsMixin):
-        """Test upload attachment with no file path."""
-        result = attachments_mixin.upload_attachment("123", "")
+        """Test upload attachment with no file path and no content."""
+        result = attachments_mixin.upload_attachment("123", file_path="")
 
         assert result["success"] is False
-        assert "No file path provided" in result["error"]
+        assert (
+            "Either file_path or (filename + content) must be provided"
+            in result["error"]
+        )
 
     def test_upload_attachment_file_not_found(
         self, attachments_mixin: AttachmentsMixin
@@ -211,6 +214,66 @@ class TestAttachmentsMixin:
 
             assert result["success"] is False
             assert "File not found" in result["error"]
+
+    def test_upload_attachment_with_content_success(
+        self, attachments_mixin: AttachmentsMixin
+    ):
+        """Test upload attachment with base64 content."""
+        import base64
+
+        test_content = b"Test file content"
+        encoded_content = base64.b64encode(test_content).decode("utf-8")
+
+        attachments_mixin.confluence.attach_content.return_value = {
+            "id": "att123",
+            "title": "test.txt",
+        }
+
+        result = attachments_mixin.upload_attachment(
+            page_id="123",
+            filename="test.txt",
+            content=encoded_content,
+            comment="Test upload",
+        )
+
+        assert result["success"] is True
+        assert result["filename"] == "test.txt"
+        assert result["size"] == len(test_content)
+        attachments_mixin.confluence.attach_content.assert_called_once_with(
+            content=test_content,
+            name="test.txt",
+            page_id="123",
+            comment="Test upload",
+        )
+
+    def test_upload_attachment_both_path_and_content(
+        self, attachments_mixin: AttachmentsMixin
+    ):
+        """Test upload attachment with both file_path and content (should fail)."""
+        result = attachments_mixin.upload_attachment(
+            page_id="123",
+            file_path="/path/to/file.txt",
+            filename="test.txt",
+            content="base64content",
+        )
+
+        assert result["success"] is False
+        assert "Cannot specify both file_path and content" in result["error"]
+
+    def test_upload_attachment_content_without_filename(
+        self, attachments_mixin: AttachmentsMixin
+    ):
+        """Test upload attachment with content but no filename."""
+        result = attachments_mixin.upload_attachment(
+            page_id="123",
+            content="base64content",
+        )
+
+        assert result["success"] is False
+        assert (
+            "Either file_path or (filename + content) must be provided"
+            in result["error"]
+        )
 
     def test_upload_attachments_success(self, attachments_mixin: AttachmentsMixin):
         """Test successful upload of multiple attachments."""
@@ -270,6 +333,49 @@ class TestAttachmentsMixin:
             assert result["success"] is True
             assert len(result["uploaded"]) == 2
             assert len(result["failed"]) == 1
+
+    def test_upload_attachments_with_content(self, attachments_mixin: AttachmentsMixin):
+        """Test upload multiple attachments using base64 content."""
+        import base64
+
+        test_attachments = [
+            {
+                "filename": "file1.txt",
+                "content": base64.b64encode(b"Content 1").decode("utf-8"),
+            },
+            {
+                "filename": "file2.txt",
+                "content": base64.b64encode(b"Content 2").decode("utf-8"),
+            },
+        ]
+
+        mock_results = [
+            {"success": True, "filename": "file1.txt", "size": 9},
+            {"success": True, "filename": "file2.txt", "size": 9},
+        ]
+
+        with patch.object(
+            attachments_mixin, "upload_attachment", side_effect=mock_results
+        ) as mock_upload:
+            result = attachments_mixin.upload_attachments(
+                page_id="123", attachments=test_attachments
+            )
+
+            assert result["success"] is True
+            assert result["total"] == 2
+            assert len(result["uploaded"]) == 2
+            assert mock_upload.call_count == 2
+
+    def test_upload_attachments_both_params(self, attachments_mixin: AttachmentsMixin):
+        """Test upload attachments with both file_paths and attachments (should fail)."""
+        result = attachments_mixin.upload_attachments(
+            page_id="123",
+            file_paths=["/path/to/file.txt"],
+            attachments=[{"filename": "test.txt", "content": "base64"}],
+        )
+
+        assert result["success"] is False
+        assert "Cannot specify both file_paths and attachments" in result["error"]
 
     def test_download_attachment_success(self, attachments_mixin: AttachmentsMixin):
         """Test successful attachment download."""
