@@ -52,27 +52,21 @@ class AttachmentsMixin(ConfluenceClient):
     def upload_attachment(
         self,
         page_id: str,
-        file_path: str | None = None,
-        filename: str | None = None,
-        content: str | None = None,
+        filename: str,
+        content: str,
         comment: str | None = None,
     ) -> dict[str, Any]:
         """
-        Upload a single attachment to a Confluence page.
+        Upload a single attachment to a Confluence page using base64-encoded content.
 
         Args:
             page_id: The ID of the page to attach the file to
-            file_path: The path to the file to upload (for local files)
-            filename: The name for the attachment (required when using content)
-            content: Base64-encoded file content (alternative to file_path)
+            filename: The name for the attachment file
+            content: Base64-encoded file content
             comment: Optional comment for the attachment
 
         Returns:
             A dictionary with upload result information
-
-        Note:
-            Either file_path OR (filename + content) must be provided.
-            Use content parameter when running in Docker to avoid filesystem issues.
         """
         import base64
 
@@ -80,58 +74,28 @@ class AttachmentsMixin(ConfluenceClient):
             logger.error("No page ID provided for attachment upload")
             return {"success": False, "error": "No page ID provided"}
 
-        # Validate input parameters
-        if not file_path and not (filename and content):
-            logger.error("Either file_path or (filename + content) must be provided")
-            return {
-                "success": False,
-                "error": "Either file_path or (filename + content) must be provided",
-            }
+        if not filename:
+            logger.error("No filename provided for attachment upload")
+            return {"success": False, "error": "No filename provided"}
 
-        if file_path and content:
-            logger.error("Cannot specify both file_path and content")
-            return {
-                "success": False,
-                "error": "Cannot specify both file_path and content",
-            }
+        if not content:
+            logger.error("No content provided for attachment upload")
+            return {"success": False, "error": "No content provided"}
 
         try:
-            if content:
-                # Upload from base64-encoded content
-                logger.info(
-                    f"Uploading attachment {filename} to page {page_id} from content"
-                )
-                file_content = base64.b64decode(content)
-                file_size = len(file_content)
+            logger.info(f"Uploading attachment {filename} to page {page_id}")
 
-                # Use attach_content method
-                attachment = self.confluence.attach_content(
-                    content=file_content,
-                    name=filename,
-                    page_id=page_id,
-                    comment=comment,
-                )
-            else:
-                # Upload from file path (original behavior)
-                # Convert to absolute path if relative
-                if not os.path.isabs(file_path):
-                    file_path = os.path.abspath(file_path)
+            # Decode base64 content
+            file_content = base64.b64decode(content)
+            file_size = len(file_content)
 
-                # Check if file exists
-                if not os.path.exists(file_path):
-                    logger.error(f"File not found: {file_path}")
-                    return {"success": False, "error": f"File not found: {file_path}"}
-
-                logger.info(f"Uploading attachment from {file_path} to page {page_id}")
-
-                # Use the Confluence API to upload the file
-                filename = os.path.basename(file_path)
-                file_size = os.path.getsize(file_path)
-                attachment = self.confluence.attach_file(
-                    filename=file_path,
-                    page_id=page_id,
-                    comment=comment,
-                )
+            # Use attach_content method
+            attachment = self.confluence.attach_content(
+                content=file_content,
+                name=filename,
+                page_id=page_id,
+                comment=comment,
+            )
 
             if attachment:
                 logger.info(
@@ -153,116 +117,12 @@ class AttachmentsMixin(ConfluenceClient):
                 )
                 return {
                     "success": False,
-                    "error": (
-                        f"Failed to upload attachment {filename} to page {page_id}"
-                    ),
+                    "error": f"Failed to upload attachment {filename} to page {page_id}",
                 }
 
         except Exception:
             logger.exception("Error uploading attachment")
             return {"success": False, "error": "Failed to upload attachment"}
-
-    def upload_attachments(
-        self,
-        page_id: str,
-        file_paths: list[str] | None = None,
-        attachments: list[dict[str, str]] | None = None,
-        comment: str | None = None,
-    ) -> dict[str, Any]:
-        """
-        Upload multiple attachments to a Confluence page.
-
-        Args:
-            page_id: The ID of the page to attach files to
-            file_paths: List of paths to files to upload (for local files)
-            attachments: List of dicts with 'filename' and 'content' (base64) keys
-            comment: Optional comment for the attachments
-
-        Returns:
-            A dictionary with upload results
-
-        Note:
-            Either file_paths OR attachments must be provided.
-            Use attachments parameter when running in Docker.
-        """
-        if not page_id:
-            logger.error("No page ID provided for attachment upload")
-            return {"success": False, "error": "No page ID provided"}
-
-        if not file_paths and not attachments:
-            logger.error("Either file_paths or attachments must be provided")
-            return {
-                "success": False,
-                "error": "Either file_paths or attachments must be provided",
-            }
-
-        if file_paths and attachments:
-            logger.error("Cannot specify both file_paths and attachments")
-            return {
-                "success": False,
-                "error": "Cannot specify both file_paths and attachments",
-            }
-
-        # Determine which mode to use
-        if attachments:
-            items_count = len(attachments)
-            logger.info(
-                f"Uploading {items_count} attachments to page {page_id} from content"
-            )
-        else:
-            items_count = len(file_paths)
-            logger.info(
-                f"Uploading {items_count} attachments to page {page_id} from files"
-            )
-
-        # Upload each attachment
-        uploaded = []
-        failed = []
-
-        if attachments:
-            # Content-based upload
-            for attachment_data in attachments:
-                filename = attachment_data.get("filename")
-                content = attachment_data.get("content")
-                result = self.upload_attachment(
-                    page_id=page_id,
-                    filename=filename,
-                    content=content,
-                    comment=comment,
-                )
-                if result.get("success"):
-                    uploaded.append(
-                        {
-                            "filename": result.get("filename"),
-                            "size": result.get("size"),
-                        }
-                    )
-                else:
-                    failed.append({"filename": filename, "error": result.get("error")})
-        else:
-            # File path-based upload
-            for file_path in file_paths:
-                result = self.upload_attachment(
-                    page_id=page_id, file_path=file_path, comment=comment
-                )
-                if result.get("success"):
-                    uploaded.append(
-                        {
-                            "filename": result.get("filename"),
-                            "size": result.get("size"),
-                        }
-                    )
-                else:
-                    failed.append({"filename": file_path, "error": result.get("error")})
-
-        total_count = items_count
-        return {
-            "success": True,
-            "page_id": page_id,
-            "total": total_count,
-            "uploaded": uploaded,
-            "failed": failed,
-        }
 
     def download_attachment(
         self, page_id: str, attachment_id: str, target_path: str
