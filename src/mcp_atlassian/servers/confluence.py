@@ -744,3 +744,242 @@ async def search_user(
             indent=2,
             ensure_ascii=False,
         )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_attachments(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be found in the page URL). "
+                "For example, in the URL 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title', "
+                "the page ID is '123456789'."
+            )
+        ),
+    ],
+) -> str:
+    """Get attachments for a specific Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+
+    Returns:
+        JSON string representing a list of attachment objects.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    attachments = confluence_fetcher.get_page_attachments(page_id)
+    formatted_attachments = [
+        attachment.to_simplified_dict() for attachment in attachments
+    ]
+    return json.dumps(formatted_attachments, indent=2, ensure_ascii=False)
+
+
+@confluence_mcp.tool(tags={"confluence", "write"})
+@check_write_access
+async def upload_attachment(
+    ctx: Context,
+    page_id: Annotated[
+        str, Field(description="The ID of the page to attach the file to")
+    ],
+    file_path: Annotated[
+        str,
+        Field(
+            description=(
+                "The absolute or relative path to the file to upload. "
+                "Relative paths will be resolved relative to the current working directory."
+            )
+        ),
+    ],
+    comment: Annotated[
+        str | None,
+        Field(
+            description="Optional comment for the attachment",
+            default=None,
+        ),
+    ] = None,
+) -> str:
+    """Upload an attachment to a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: The ID of the page to attach the file to.
+        file_path: The path to the file to upload.
+        comment: Optional comment for the attachment.
+
+    Returns:
+        JSON string indicating success or failure with attachment details.
+
+    Raises:
+        ValueError: If in read-only mode or Confluence client is unavailable.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    result = confluence_fetcher.upload_attachment(
+        page_id=page_id, file_path=file_path, comment=comment
+    )
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@confluence_mcp.tool(tags={"confluence", "write"})
+@check_write_access
+async def upload_attachments(
+    ctx: Context,
+    page_id: Annotated[
+        str, Field(description="The ID of the page to attach the files to")
+    ],
+    file_paths: Annotated[
+        list[str],
+        Field(
+            description=(
+                "List of absolute or relative paths to files to upload. "
+                "Relative paths will be resolved relative to the current working directory."
+            )
+        ),
+    ],
+    comment: Annotated[
+        str | None,
+        Field(
+            description="Optional comment for the attachments",
+            default=None,
+        ),
+    ] = None,
+) -> str:
+    """Upload multiple attachments to a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: The ID of the page to attach the files to.
+        file_paths: List of paths to files to upload.
+        comment: Optional comment for the attachments.
+
+    Returns:
+        JSON string with results for each file upload.
+
+    Raises:
+        ValueError: If in read-only mode or Confluence client is unavailable.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    result = confluence_fetcher.upload_attachments(
+        page_id=page_id, file_paths=file_paths, comment=comment
+    )
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def download_attachment(
+    ctx: Context,
+    page_id: Annotated[
+        str, Field(description="The ID of the page containing the attachment")
+    ],
+    attachment_id: Annotated[
+        str, Field(description="The ID of the attachment to download")
+    ],
+    target_path: Annotated[
+        str,
+        Field(
+            description=(
+                "The absolute or relative path where the attachment should be saved. "
+                "Relative paths will be resolved relative to the current working directory."
+            )
+        ),
+    ],
+) -> str:
+    """Download an attachment from a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: The ID of the page containing the attachment.
+        attachment_id: The ID of the attachment to download.
+        target_path: The path where the attachment should be saved.
+
+    Returns:
+        JSON string indicating success or failure.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    success = confluence_fetcher.download_attachment(
+        page_id=page_id, attachment_id=attachment_id, target_path=target_path
+    )
+    result = {
+        "success": success,
+        "message": (
+            f"Successfully downloaded attachment {attachment_id} to {target_path}"
+            if success
+            else f"Failed to download attachment {attachment_id}"
+        ),
+    }
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def download_page_attachments(
+    ctx: Context,
+    page_id: Annotated[
+        str, Field(description="The ID of the page to download attachments from")
+    ],
+    target_dir: Annotated[
+        str,
+        Field(
+            description=(
+                "The absolute or relative path to the directory where attachments should be saved. "
+                "Relative paths will be resolved relative to the current working directory. "
+                "The directory will be created if it doesn't exist."
+            )
+        ),
+    ],
+) -> str:
+    """Download all attachments from a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: The ID of the page to download attachments from.
+        target_dir: The directory where attachments should be saved.
+
+    Returns:
+        JSON string with results for each attachment download.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    result = confluence_fetcher.download_page_attachments(
+        page_id=page_id, target_dir=target_dir
+    )
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@confluence_mcp.tool(tags={"confluence", "write"})
+@check_write_access
+async def delete_attachment(
+    ctx: Context,
+    page_id: Annotated[
+        str, Field(description="The ID of the page containing the attachment")
+    ],
+    attachment_id: Annotated[
+        str, Field(description="The ID of the attachment to delete")
+    ],
+) -> str:
+    """Delete an attachment from a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: The ID of the page containing the attachment.
+        attachment_id: The ID of the attachment to delete.
+
+    Returns:
+        JSON string indicating success or failure.
+
+    Raises:
+        ValueError: If in read-only mode or Confluence client is unavailable.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    success = confluence_fetcher.delete_attachment(
+        page_id=page_id, attachment_id=attachment_id
+    )
+    result = {
+        "success": success,
+        "message": (
+            f"Successfully deleted attachment {attachment_id} from page {page_id}"
+            if success
+            else f"Failed to delete attachment {attachment_id} from page {page_id}"
+        ),
+    }
+    return json.dumps(result, indent=2, ensure_ascii=False)

@@ -81,6 +81,8 @@ class TestConfluenceAttachment:
             status="current",
             media_type="application/binary",
             file_size=1098,
+            download_url="/download/attachments/123/random_geometric_image.svg",
+            web_url="/pages/123/random_geometric_image.svg",
         )
 
         simplified = attachment.to_simplified_dict()
@@ -92,6 +94,11 @@ class TestConfluenceAttachment:
         assert simplified["status"] == "current"
         assert simplified["media_type"] == "application/binary"
         assert simplified["file_size"] == 1098
+        assert (
+            simplified["download_url"]
+            == "/download/attachments/123/random_geometric_image.svg"
+        )
+        assert simplified["web_url"] == "/pages/123/random_geometric_image.svg"
 
 
 class TestConfluenceUser:

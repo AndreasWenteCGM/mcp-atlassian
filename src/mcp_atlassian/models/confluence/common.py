@@ -90,6 +90,8 @@ class ConfluenceAttachment(ApiModel):
     title: str | None = None
     media_type: str | None = None
     file_size: int | None = None
+    download_url: str | None = None
+    web_url: str | None = None
 
     @classmethod
     def from_api_response(
@@ -107,6 +109,11 @@ class ConfluenceAttachment(ApiModel):
         if not data:
             return cls()
 
+        # Extract download and web URLs from _links
+        links = data.get("_links", {})
+        download_url = links.get("download")
+        web_url = links.get("webui")
+
         return cls(
             id=data.get("id"),
             type=data.get("type"),
@@ -114,6 +121,8 @@ class ConfluenceAttachment(ApiModel):
             title=data.get("title"),
             media_type=data.get("extensions", {}).get("mediaType"),
             file_size=data.get("extensions", {}).get("fileSize"),
+            download_url=download_url,
+            web_url=web_url,
         )
 
     def to_simplified_dict(self) -> dict[str, Any]:
@@ -125,4 +134,6 @@ class ConfluenceAttachment(ApiModel):
             "title": self.title,
             "media_type": self.media_type,
             "file_size": self.file_size,
+            "download_url": self.download_url,
+            "web_url": self.web_url,
         }
