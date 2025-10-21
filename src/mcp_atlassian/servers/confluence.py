@@ -11,6 +11,7 @@ from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 from mcp_atlassian.servers.dependencies import get_confluence_fetcher
 from mcp_atlassian.utils.decorators import (
     check_write_access,
+    handle_mcp_tool_errors,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ confluence_mcp = FastMCP(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def search(
     ctx: Context,
     query: Annotated[
@@ -111,6 +113,7 @@ async def search(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def get_page(
     ctx: Context,
     page_id: Annotated[
@@ -227,6 +230,7 @@ async def get_page(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def get_page_children(
     ctx: Context,
     parent_id: Annotated[
@@ -315,6 +319,7 @@ async def get_page_children(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def get_comments(
     ctx: Context,
     page_id: Annotated[
@@ -344,6 +349,7 @@ async def get_comments(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def get_labels(
     ctx: Context,
     page_id: Annotated[
@@ -374,6 +380,7 @@ async def get_labels(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 @check_write_access
+@handle_mcp_tool_errors
 async def add_label(
     ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to update")],
@@ -400,6 +407,7 @@ async def add_label(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 @check_write_access
+@handle_mcp_tool_errors
 async def create_page(
     ctx: Context,
     space_key: Annotated[
@@ -492,6 +500,7 @@ async def create_page(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 @check_write_access
+@handle_mcp_tool_errors
 async def update_page(
     ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to update")],
@@ -586,6 +595,7 @@ async def update_page(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 @check_write_access
+@handle_mcp_tool_errors
 async def delete_page(
     ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to delete")],
@@ -628,6 +638,7 @@ async def delete_page(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 @check_write_access
+@handle_mcp_tool_errors
 async def add_comment(
     ctx: Context,
     page_id: Annotated[
@@ -677,6 +688,7 @@ async def add_comment(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+@handle_mcp_tool_errors
 async def search_user(
     ctx: Context,
     query: Annotated[
